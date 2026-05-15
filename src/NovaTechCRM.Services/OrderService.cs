@@ -28,13 +28,21 @@ public class OrderService
         order.Status = OrderStatus.FraudCheckPending;
         await _orderRepo.SaveAsync(order, ct);
 
-        // BUG (NOVA-47): FraudShield check is fired without awaiting the result.
-        // The _ discard means we never inspect whether the check passed or failed.
-        // FulfillOrderAsync runs immediately after, racing against the fraud check.
-        // On fast machines this usually works, but under any I/O latency the order
-        // gets fulfilled before FraudShield responds, bypassing fraud controls entirely.
-        _ = _fraudShield.CheckAsync(order, ct);
+        var fraudResult = await _fraudShield.CheckAsync(order, ct);
 
+        if (!fraudResult.Passed)
+        {
+            order.Status = OrderStatus.Rejected;
+            order.FraudCheckPassed = false;
+            await _orderRepo.SaveAsync(order, ct);
+            await _notifications.SendFraudAlertAsync(order, fraudResult, ct);
+            _logger.LogWarning("Order {OrderId} rejected by FraudShield: risk={RiskLevel}, reason={Reason}",
+                order.Id, fraudResult.RiskLevel, fraudResult.Reason);
+            return order;
+        }
+
+        order.FraudCheckId = fraudResult.CheckId;
+        order.FraudCheckPassed = true;
         await FulfillOrderAsync(order, ct);
 
         return order;
