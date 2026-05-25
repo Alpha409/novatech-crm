@@ -1,35 +1,66 @@
 # NovaTech CRM — Discount Business Rules
 
-_Last updated by Sales Ops, approved by Finance — Q3 2023_
+_Last updated by Sales Ops — Q3 2023. Finance dispute raised Q1 2024._
 
 ---
 
-## How Discounts Work
+## The Dispute
 
-When multiple discount rules apply to an order, they must be applied in the
-following mandatory order:
+Finance and Sales are disagreeing on how discounts should be calculated.
 
-1. **Percentage discounts first** — all percentage-based discounts are applied
-   to the original order total before any flat-amount deductions.
-2. **Flat-amount discounts second** — fixed dollar deductions are applied after
-   all percentage discounts have been calculated.
+**Sales** says: a customer with both a Contract discount (10%) and a Promotional
+discount (20%) should receive both — the engine applies all matching rules.
 
-### Why this order matters
+**Finance** says: only the highest-priority rule should apply. A customer with a
+Contract discount gets exactly that — 10% off. The Promotional discount is
+irrelevant because a higher-priority rule already matched.
 
-Consider a $200 order with a 20% promotional discount and a $50 loyalty voucher:
+**Finance is correct.** The original design spec (attached) is clear: rules
+cascade by priority and only ONE rule is applied per order.
 
-| Step | Correct (% first)         | Wrong (flat first)         |
-|------|---------------------------|----------------------------|
-| 1    | $200 × 0.80 = **$160**    | $200 − $50 = **$150**      |
-| 2    | $160 − $50  = **$110** ✓  | $150 × 0.80 = **$120** ✗   |
+---
 
-The correct final price is **$110**. Applying flat amounts first inflates the
-effective percentage saving and results in the customer being **overcharged**.
+## Cascade Priority Rules
 
-Finance's spreadsheet implements this correctly.
-Sales's system was also correct until the discount engine was refactored in
-commit `a3f9c2` (October 2023) — the refactor changed rule iteration to
-insertion order, silently breaking the % → flat guarantee.
+| Priority | Category    | Description                              |
+|----------|-------------|------------------------------------------|
+| 1        | Contract    | Negotiated rate locked in customer MSA   |
+| 2        | Promotional | Time-limited campaign (e.g. Black Friday) |
+| 3        | Volume      | Tier discount based on order quantity    |
+| 4        | Default     | Catch-all discount for all customers     |
+
+**Only the single highest-priority matching active rule is applied.**
+Rules do not stack. If a customer matches Contract and Promotional, only
+Contract applies.
+
+---
+
+## Example
+
+Customer has two active rules:
+- Contract discount: **10% off** (priority 1)
+- Promotional discount: **20% off** (priority 2)
+
+| Calculation        | Result  | Correct? |
+|--------------------|---------|----------|
+| Apply Contract only: $100 × 0.90 | **$90** | ✓ |
+| Apply both (current bug): $100 × 0.90 × 0.80 | **$72** | ✗ |
+
+The engine currently applies both rules additively, giving customers more
+discount than they are entitled to. Finance discovered this during the Q4
+revenue reconciliation — NovaTech is under-charging contracted customers.
+
+---
+
+## Root Cause
+
+The `DiscountEngine.Apply()` method iterates all active rules in a `foreach`
+loop without any priority filtering. The correct implementation should:
+
+1. Filter to active rules only
+2. Order by `Category` ascending (Contract = 1 is highest priority)
+3. Take the **first** (highest-priority) matching rule
+4. Apply only that single rule
 
 ---
 
@@ -37,16 +68,4 @@ insertion order, silently breaking the % → flat guarantee.
 
 - Discounts cannot reduce an order below $0.
 - Inactive rules (`IsActive = false`) are always skipped.
-- Percentage values are whole numbers (20 = 20%, not 0.20).
-- Flat-amount discounts are in USD.
-
----
-
-## Affected Scenarios
-
-The bug only manifests when an order has **both** at least one Percentage rule
-**and** at least one FlatAmount rule, AND the FlatAmount rule has a lower `Id`
-(i.e. was created earlier) than the Percentage rule.
-
-Single-discount orders are unaffected — which is why Sales did not notice the
-regression during their own testing.
+- `DiscountPercent` is a whole number (15 = 15%, not 0.15).

@@ -1,22 +1,28 @@
 namespace NovaTechCRM.Domain.Models;
 
-public enum DiscountType
+/// <summary>
+/// Discount category determines priority. Only the single highest-priority
+/// matching rule should be applied — rules do NOT stack.
+/// Priority: Contract (1) > Promotional (2) > Volume (3) > Default (4)
+/// </summary>
+public enum DiscountCategory
 {
-    Percentage,   // e.g. 20% off
-    FlatAmount    // e.g. $50 off
+    Contract    = 1,   // Negotiated per-customer contract rate — highest priority
+    Promotional = 2,   // Time-limited campaign discount
+    Volume      = 3,   // Quantity-based tier discount
+    Default     = 4,   // Catch-all discount — lowest priority
 }
 
 public class DiscountRule
 {
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
-    public DiscountType Type { get; set; }
+    public DiscountCategory Category { get; set; }
 
     /// <summary>
-    /// For Percentage: value between 0 and 100 (e.g. 20 = 20% off).
-    /// For FlatAmount: absolute dollar amount to deduct (e.g. 50 = $50 off).
+    /// Percentage discount (0–100). E.g. 15 means 15% off.
     /// </summary>
-    public decimal Value { get; set; }
+    public decimal DiscountPercent { get; set; }
 
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
