@@ -9,17 +9,11 @@ public interface IDiscountEngine
 
 public class DiscountEngine : IDiscountEngine
 {
-    /// <summary>
-    /// Applies all active discount rules to the original price and returns the final price.
-    ///
-    /// Rules are applied in the order they are received (typically insertion order / ID order).
-    /// Both Percentage and FlatAmount discounts reduce the running total sequentially.
-    /// </summary>
     public decimal Apply(decimal originalPrice, IEnumerable<DiscountRule> rules)
     {
         var price = originalPrice;
 
-        foreach (var rule in rules.Where(r => r.IsActive))
+        foreach (var rule in rules.Where(r => r.IsActive).OrderBy(r => r.Type))
         {
             if (rule.Type == DiscountType.Percentage)
             {
