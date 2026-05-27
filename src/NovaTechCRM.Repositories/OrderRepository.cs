@@ -3,30 +3,7 @@ using NovaTechCRM.Domain.Models;
 
 namespace NovaTechCRM.Repositories;
 
-public class NovaTechDbContext : DbContext
-{
-    public NovaTechDbContext(DbContextOptions<NovaTechDbContext> options) : base(options) { }
-
-    public DbSet<Order> Orders => Set<Order>();
-    public DbSet<OrderItem> OrderItems => Set<OrderItem>();
-
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
-    {
-        modelBuilder.Entity<Order>()
-            .HasMany(o => o.Items)
-            .WithOne()
-            .HasForeignKey("OrderId")
-            .OnDelete(DeleteBehavior.Cascade);
-
-        modelBuilder.Entity<Order>()
-            .Property(o => o.TotalAmount)
-            .HasPrecision(18, 2);
-
-        modelBuilder.Entity<OrderItem>()
-            .Property(i => i.UnitPrice)
-            .HasPrecision(18, 2);
-    }
-}
+// DbContext moved to NovaTechDbContext.cs when more entities were added
 
 public class OrderRepository : IOrderRepository
 {
