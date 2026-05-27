@@ -39,15 +39,9 @@ public class ShipmentService : IShipmentService
         int customerId, CancellationToken ct = default) =>
         await _shipmentRepo.GetByCustomerAsync(customerId, ct);
 
-    // NOVA-91: Uses DateRange.LastNDays which calls DateTime.Now (local server time).
-    // On a server in UTC+5, "last 7 days" starts 5 hours later than UTC midnight.
-    // Shipments estimated for e.g. 2024-03-10 23:00 UTC appear on-time to the DB
-    // (stored as UTC) but the window query misses them because the boundary is in local time.
-    // Symptom: late shipments don't appear in the dashboard for ~5 hours after they're late.
     public async Task<IReadOnlyList<Shipment>> GetLateShipmentsAsync(CancellationToken ct = default)
     {
-        // BUG: should use DateRange.LastNDaysUtc or just DateTime.UtcNow directly
-        var window = DateRange.LastNDays(30);
+        var window = DateRange.LastNDaysUtc(30);
 
         var shipments = await _shipmentRepo.GetByEstimatedDeliveryRangeAsync(
             window.Start, window.End, ct);
