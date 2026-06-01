@@ -4,6 +4,7 @@ namespace NovaTechCRM.Tests.Builders;
 
 // Fluent test-data builders — keeps test setup readable and avoids copy-paste noise.
 // Not a full fixture library; just the entities we construct repeatedly.
+//kndsnc,xzc,mn
 
 public class CustomerBuilder
 {
@@ -15,7 +16,7 @@ public class CustomerBuilder
     private decimal _monthlySpend  = 0m;
     private decimal _totalSpend    = 0m;
 
-    public CustomerBuilder WithId(int id)             { _id    = id;    return this; }
+
     public CustomerBuilder WithName(string name)      { _name  = name;  return this; }
     public CustomerBuilder WithEmail(string email)    { _email = email; return this; }
     public CustomerBuilder WithTier(CustomerTier t)   { _tier  = t;     return this; }
